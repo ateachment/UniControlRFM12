@@ -2,7 +2,7 @@
  * main.c
  * Function: transmit string with variable length (up to 32 bytes) via RFM12 module
  * with pre-appended checksum
- * Created: 2024-06-11
+ * Created: 2026-06-11
  * Author: Eick
  */ 
 
@@ -22,10 +22,15 @@ void send(void);
 
 int main(void)
 {
-	// für Debugging LED2 einschalten
-    DDRD |= (1 << LED2); 
-	PORTD |= (1 << LED2);
+	DDRD |= (1 << LED1) | (1 << LED2);	// Richtungsregister LEDs
 
+	
+	
+	
+	// für Debugging LED2 einschalten
+	//PORTD |= (1 << LED2);
+	
+	//PORTD &= ~(1 << PD5);  // debug: LED2 ausschalten
 
 
 
@@ -35,11 +40,12 @@ int main(void)
 	rf12_setbaud(19200);				// 19200 baud
 	rf12_setpower(0, 6);				// 1mW Ausgangangsleistung, 120kHz Frequenzshift
 
-	DDRD |= (1 << LED1)|(1 << LED2);	// Richtungsregister LEDs
+	
 
 	while(1)
 	{
 		send();
+		
 		if(RF12_Index >= 24)  //Test ohne Pruefsumme 22)
 			PORTD |= (1 << LED1);
 		else

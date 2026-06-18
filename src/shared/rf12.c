@@ -19,7 +19,7 @@
  * @author      Juergen Eckert
  * @author  	Ulrich Radig (mail@ulrichradig.de) www.ulrichradig.de
  * @author  	Wolfhard Eick (w@eick-at.de) www.eick-at.de
- * @date        11.05.2015
+ * @date        18.06.2026 (mit Hilfe von Gemini Flash)
 ##############################################################################*/
 
 
@@ -40,17 +40,17 @@
 
 
 #if defined(__AVR_ATtiny2313__) || defined(__AVR_ATtiny2313A__)
-    // pins for ATtiny2313 on Pollin-Board
-    #define SDI     5   // PB5 (DI) -> geht an SDO des RFM12
-    #define SDO     6   // PB6 (DO) -> geht an SDI des RFM12
-    #define SCK     7   // PB7 (USCK)-> geht an SCK des RFM12
-    #define nSEL    4   // PB4       -> geht an nSEL des RFM12
+    // Pins for ATtiny2313 on Pollin-Board v1.2
+    #define SDI      5   // PB5 (Connects to RFM12 SDI input -> OUTPUT for Tiny)
+    #define SDO      6   // PB6 (Connects to RFM12 SDO output -> INPUT for Tiny)
+    #define SCK      7   // PB7 (SPI Clock)
+    #define nSEL     4   // PB4 (Chip Select)
 #else
-    // pins for ATmega8 on Pollin-Board
-    #define SDI     3   // MOSI
-    #define SDO     4   // MISO
-    #define SCK     5   // SCK
-    #define nSEL    2   // SS
+    // Pins for ATmega8 on Pollin-Board v1.2 (Hardware SPI)
+    #define SDI      3   // PB3 (MOSI)
+    #define SDO      4   // PB4 (MISO)
+    #define SCK      5   // PB5 (SCK)
+    #define nSEL     2   // PB2 (SS)
 #endif
 
 // =====================================================================
@@ -63,107 +63,88 @@ unsigned char RF12_Data[34];
 volatile struct RF12_stati RF12_status;
 #endif
 
-
-// USI Hilfsfunktion zum Senden/Empfangen eines einzelnen Bytes (Hardware-getaktet)
-#ifdef USI_MODE
-unsigned char usi_xfer(unsigned char data)
-{
-    USIDR = data;
-    USISR = (1<<USIOIF); // Clear Counter Overflow Flag
-    
-    // Drei-Draht-Modus (SPI), externer Takt (Software-Strobe via USITC)
-    while ( !(USISR & (1<<USIOIF)) )
-    {
-        USICR = (1<<USIWM0)|(1<<USICS1)|(1<<USICLK)|(1<<USITC);
-    }
-    return USIDR;
-}
-#endif
-
 unsigned short rf12_trans(unsigned short wert)
-{	
-	unsigned short werti=0;
-	cbi(RF_PORT, nSEL);		// /SS (slave select auf 0)
+{   
+    unsigned short werti = 0;
+    cbi(RF_PORT, nSEL);     // /SS (slave select to 0)
 
-#ifdef SPI_MODE		//Routine for Hardware SPI
-	SPDR = (0xFF00 & wert)>>8;		// erst MSB dem Dataregister zuweisen
-	while(!(SPSR & (1<<SPIF))){};  	// Leerschleife solange das End of transmission flag im Statusregister
-									// nicht ungleich 0 (also 0) ist.
+#ifdef SPI_MODE     // Routine for Hardware SPI (ATmega8)
+    SPDR = (0xFF00 & wert) >> 8;      // Assign MSB to data register first
+    while(!(SPSR & (1 << SPIF))){};   // Loop until End of Transmission flag is set
 
-	werti = (SPDR<<8);				// 1.Byte als MSB sichern
-	
-	SPDR = (0x00ff & wert);		// LSB dem Dataregister zuweisen
-	while(!(SPSR & (1<<SPIF))){};	// warten s.o.
-	werti = werti + SPDR;		// 2.Byte als LSB sichern
+    werti = (SPDR << 8);              // Save 1st byte as MSB
+    
+    SPDR = (0x00ff & wert);           // Assign LSB to data register
+    while(!(SPSR & (1 << SPIF))){};   // Wait again (as above)
+    werti = werti + SPDR;             // Save 2nd byte as LSB
 
-#else               // Präzises Software SPI (Mode 0) für ATtiny2313
+#else               // Precise Software SPI for ATtiny2313 (Pollin v1.2 Layout)
     unsigned char i;
     
-    cbi(RF_PORT, nSEL); // Modul aktivieren (LOW)
+    cbi(RF_PORT, nSEL); 
+    cbi(RF_PORT, SCK);  // Ensure Clock starts LOW before the first bit
     _delay_us(5);
 
     for (i = 0; i < 16; i++)
     {   
-        // 1. Datenbit für das RFM12 bereitstellen
+        // 1. Present data bit stably on PB5 (SDI) -> goes to RFM12 input
         if (wert & 0x8000)
-            sbi(RF_PORT, SDO); 
+            sbi(RF_PORT, SDI); 
         else
-            cbi(RF_PORT, SDO);
+            cbi(RF_PORT, SDI);
             
         wert <<= 1;
-        _delay_us(5);       // Setup-Zeit: Signal stabilisieren lassen
-        
-        // 2. Steigende Flanke: RFM12 liest das Bit ein
+        _delay_us(5); // Setup time for data bit
+
+        // 2. Pull Clock HIGH -> RFM12 samples the data bit
         sbi(RF_PORT, SCK);
-        _delay_us(10);      // Haltezeit (High-Phase)
-        
-        // 3. Fallende Flanke: RFM12 reagiert und legt SEIN Antwortbit an die Leitung
-        cbi(RF_PORT, SCK);
-        _delay_us(5);       // Dem RFM12 Zeit geben, den Ausgangspegel stabil aufzubauen
-        
-        // 4. Erst JETZT, wo der Takt wieder LOW ist, lesen wir das stabile Antwortbit ein
+        _delay_us(5); // Hold time in HIGH state
+
+        // 3. Sample the incoming data bit from PB6 (SDO) while Clock is still HIGH
         werti <<= 1;
-        if (RF_PIN & (1 << SDI))
+        if (RF_PIN & (1 << SDO)) 
         {
             werti |= 1;
         }
-        _delay_us(5);       // Sicherheitspause vor dem nächsten Bit
+
+        // 4. Pull Clock LOW again for the next bit
+        cbi(RF_PORT, SCK);
+        _delay_us(5); // Pause in LOW state
     }
-    
-    sbi(RF_PORT, nSEL); // Modul deaktivieren (HIGH)
 #endif
-	sbi(RF_PORT, nSEL);  // Slave Select inaktiv (HIGH)
-	return werti;
+    sbi(RF_PORT, nSEL);  // Slave Select inactive (HIGH)
+    return werti;
 }
 
 
 void rf12_init(void)
 {
-
 #if defined(__AVR_ATtiny2313__) || defined(__AVR_ATtiny2313A__)
-    // DO, USCK und nSEL als Ausgang. DI (SDI) bleibt Eingang.
-    RF_DDR = (1<<SDO)|(1<<SCK)|(1<<nSEL);
+    // Set PB5 (SDI), PB7 (SCK), PB4 (nSEL) as Output. PB6 (SDO) remains Input.
+    RF_DDR = (1 << SDI) | (1 << SCK) | (1 << nSEL);
+    // Set nSEL HIGH and enable internal pull-up resistor on PB6 (SDO)
+    RF_PORT = (1 << nSEL) | (1 << SDO);
 #else
-    RF_DDR = (1<<SDI)|(1<<SCK)|(1<<nSEL);
+    // ATmega8 initialization
+    RF_DDR = (1 << SDI) | (1 << SCK) | (1 << nSEL);
+    RF_PORT = (1 << nSEL);
 #endif
-	RF_PORT=(1<<nSEL);
 
 #ifdef SPI_MODE
-	//Aktiviren des SPI - Bus, Clock = Idel LOW
-	//SPI Clock teilen durch 128, Enable SPI, SPI in Master Mode
-	SPCR = (1<<SPE)|(1<<MSTR)|(1<<SPR0)|(1<<SPR1);
-	SPSR &= ~(0<<SPI2X);
+    // Enable SPI, Master Mode, Clock Idle LOW, Clock Rate F_CPU / 128
+    SPCR = (1 << SPE) | (1 << MSTR) | (1 << SPR0) | (1 << SPR1);
+    SPSR &= ~(0 << SPI2X);
 #endif
 
-	_delay_ms(100);			// wait until POR done
+    _delay_ms(100); // Wait for Power-On Reset (POR) to complete
 
-	rf12_trans(0xC0E0);			// AVR CLK: 10MHz
-	rf12_trans(0x80D7);			// Enable FIFO
-	rf12_trans(0xC2AB);			// Data Filter: internal
-	rf12_trans(0xCA81);			// Set FIFO mode
-	rf12_trans(0xE000);			// disable wakeuptimer
-	rf12_trans(0xC800);			// disable low duty cycle
-	rf12_trans(0xC4F7);			// AFC settings: autotuning: -10kHz...+7,5kHz
+    rf12_trans(0xC0E0);         // AVR CLK output: 10MHz
+    rf12_trans(0x80D7);         // Enable FIFO
+    rf12_trans(0xC2AB);         // Data Filter: internal
+    rf12_trans(0xCA81);         // Set FIFO mode
+    rf12_trans(0xE000);         // Disable wakeup timer
+    rf12_trans(0xC800);         // Disable low duty cycle
+    rf12_trans(0xC4F7);         // AFC settings: autotuning: -10kHz...+7,5kHz
 }
 
 void rf12_setbandwidth(unsigned char bandwidth, unsigned char gain, unsigned char drssi)
@@ -209,7 +190,9 @@ void rf12_ready(void)
     // Schleife läuft NUR, wenn der Pin aktiv auf LOW (0) gezogen wird.
     // Sobald das Modul den Pin freigibt (Pegel steigt auf 3.3V), 
     // ist die Bedingung (== 0) falsch und die Schleife bricht sofort ab.
-    while ((RF_PIN & (1 << SDI)) == 0) 
+
+	// Horcht jetzt korrekt auf PB6 (SDO des Moduls)
+    while ((RF_PIN & (1 << SDO)) == 0) 
     {
         timeout++;
         if (timeout > 60000) 
@@ -223,7 +206,6 @@ void rf12_txdata(unsigned char *data)
 	RF12_Index = 0;
 	rf12_trans(0x8238);			// TX on
 	rf12_ready();
-		PORTD &= ~(1 << PD5);  // debug: LED2 ausschalten
 	rf12_trans(0xB8AA);
 	rf12_ready();
 	rf12_trans(0xB8AA);
@@ -237,6 +219,7 @@ void rf12_txdata(unsigned char *data)
 	{
 		rf12_ready();
 		rf12_trans(0xB800|(data[RF12_Index++]));
+			
 	} while ((data[RF12_Index-2] != '\0' || RF12_Index < 2) && RF12_Index < RF12_DataLength+2);
 	
 	rf12_ready();
