@@ -33,8 +33,6 @@ int main(void)
 	{
 		PORTD &= ~(1 << LED1) & ~(1 << LED2);   // LEDs aus
 		
-		
-		
 		if(RF12_status.Rx == 0)
 		{
 			//if(RF12_Data[2] == '0' && RF12_Data[12] == '0' && RF12_Data[22] == '\0')
@@ -50,7 +48,15 @@ int main(void)
 			if(sum == checksum(RF12_Data+2)) 	//OK -> LED1 an			
 				PORTD |= (1 << LED1);			
 			else
-				PORTD |= (1 << LED2);			//Fail -> LED2 an
+			{
+				PORTD |= (1 << LED1);	// Fail -> double blink
+				_delay_ms(40);
+				PORTD &= ~(1 << LED1);  
+				_delay_ms(180);
+				PORTD |= (1 << LED1);
+				
+				//PORTD |= (1 << LED2);			//Fail -> LED2 an
+			}
 			_delay_ms(40);
 			rf12_rxrestart();
 		}
