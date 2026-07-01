@@ -15,7 +15,7 @@
 #include "rf12.h"
 
 #define LED1    6
-#define LED2    5                       // = Relay
+#define RELAY   5                       // = LED2 on Pollin-Board v1.2 
 
 // Pins for the slide switch
 #define SWITCH_AUTO     PD7   // Position on1 (auto => timer function) at Pin 13
@@ -44,8 +44,8 @@ int main(void)
     rf12_setpower(0, 6);                // 1mW power, 120kHz frequency shift
 
     // Hardware setup: Relay explicitly OFF at startup (inverted logic: HIGH = OFF)
-    DDRD |= (1 << LED1) | (1 << LED2);  
-    PORTD |= (1 << LED2);               // Force Relay OFF immediately
+    DDRD |= (1 << LED1) | (1 << RELAY);  
+    PORTD |= (1 << RELAY);               // Force Relay OFF immediately
     PORTD &= ~(1 << LED1);              // LED1 OFF
 
     // Configure switch pins as inputs and enable internal pull-ups
@@ -101,7 +101,7 @@ int main(void)
         // ---------------------------------------------------------------------
         if (!(PIND & (1 << SWITCH_ON)))
         {
-            PORTD &= ~(1 << LED2);      // Turn relay ON (inverted logic)
+            PORTD &= ~(1 << RELAY);      // Turn relay ON (inverted logic)
             relay_timer = 0;            // Clear timer
             
             if(RF12_status.Rx == 0) 
@@ -122,11 +122,11 @@ int main(void)
                 
                 if (op_mode == MODE_TOGGLE)
                 {
-                    PORTD ^= (1 << LED2); // Invert relay state directly
+                    PORTD ^= (1 << RELAY); // Invert relay state directly
                 }
                 else
                 {
-                    PORTD &= ~(1 << LED2); // Turn relay ON
+                    PORTD &= ~(1 << RELAY); // Turn relay ON
                     relay_timer = max_timer_interval;
                 }
                 
@@ -137,7 +137,7 @@ int main(void)
             // Check Button S2: Manual reset
             if (!(PIND & (1 << BUTTON_S2)))
             {
-                PORTD |= (1 << LED2);   // Force OFF immediately
+                PORTD |= (1 << RELAY);   // Force OFF immediately
                 relay_timer = 0;
             }
 
@@ -153,11 +153,11 @@ int main(void)
                     
                     if (op_mode == MODE_TOGGLE)
                     {
-                        PORTD ^= (1 << LED2);       // Invert relay state via RF
+                        PORTD ^= (1 << RELAY);       // Invert relay state via RF
                     }
                     else
                     {
-                        PORTD &= ~(1 << LED2);      // Turn relay ON
+                        PORTD &= ~(1 << RELAY);      // Turn relay ON
                         relay_timer = max_timer_interval;
                     }
                 }
@@ -194,12 +194,12 @@ int main(void)
                     relay_timer--;
                     if (relay_timer == 0)
                     {
-                        PORTD |= (1 << LED2);       // Timeout reached -> Relay OFF
+                        PORTD |= (1 << RELAY);       // Timeout reached -> Relay OFF
                     }
                 }
                 else
                 {
-                    PORTD |= (1 << LED2);           // Ensure relay remains OFF when timer is 0
+                    PORTD |= (1 << RELAY);           // Ensure relay remains OFF when timer is 0
                 }
             }
         }
@@ -209,7 +209,7 @@ int main(void)
         // ---------------------------------------------------------------------
         else
         {
-            PORTD |= (1 << LED2);       // Force relay OFF
+            PORTD |= (1 << RELAY);       // Force relay OFF
             relay_timer = 0;
             
             if(RF12_status.Rx == 0) 

@@ -15,7 +15,7 @@
 #include "rf12.h"
 
 #define LED1     6   // PD6
-#define LED2     5   // PD5
+#define RELAY     5   // PD5
 #define BUTTON1  1   // PB1 (Pin 13 on ATtiny2313) wakeup button, connected to GND
 
 void send(void);
@@ -31,7 +31,7 @@ ISR(PCINT_vect)
 int main(void)
 {
     // 1. Configure LEDs on PORTD as Output
-    DDRD |= (1 << LED1) | (1 << LED2);  
+    DDRD |= (1 << LED1) | (1 << RELAY);  
     
     // 2. Configure Button Pin (PB1) as Input and enable internal Pull-Up
     DDRB &= ~(1 << BUTTON1);            
@@ -63,10 +63,10 @@ int main(void)
         if(RF12_Index >= 24)
             PORTD |= (1 << LED1);   // LED1 on
         else
-            PORTD |= (1 << LED2);   // LED2 on
+            PORTD |= (1 << RELAY);   // LED2 on
             
         _delay_ms(10);
-        PORTD &= ~(1 << LED1) & ~(1 << LED2); // Turn off both LEDs
+        PORTD &= ~(1 << LED1) & ~(1 << RELAY); // Turn off both LEDs
         
         // --- 2. DEBOUNCE & WAIT FOR RELEASE ---
         // Wait until the button is released (Pin goes HIGH again)
