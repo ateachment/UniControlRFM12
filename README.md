@@ -4,7 +4,7 @@ This repository contains the robust, interrupt-driven firmware for an energy-eff
 
 ---
 
-## 🛑 Problem Statement: Inefficient Hot Water Circulation
+## Problem Statement: Inefficient Hot Water Circulation
 
 Continuous loop or simple timer-blind domestic hot water (DHW) circulation pumps are highly energy-inefficient. They constantly cycle hot water through building piping networks, causing severe standby thermal losses through walls and floors. This constant cycling results in high energy waste and accelerates mechanical wear on the pump.
 
@@ -17,7 +17,7 @@ To solve this sustainably, an **on-demand wireless triggering system** is implem
 
 ---
 
-## 🏗 System Architecture
+## System Architecture
 
 The hardware layout establishes a dedicated, infrastructure-independent RF link split between an on-demand transmitter node and a mains-tied actuator receiver node.
 
@@ -47,7 +47,7 @@ Permanently installed in the basement near the DHW circulation pump.
 
 ---
 
-## 🛡 High-Noise & Reflection Handling (Subterranean Firmware Patch)
+## High-Noise & Reflection Handling (Subterranean Firmware Patch)
 
 Industrial basements can create severe RF multipath reflections and interference. Under extreme noise, the RFM12 can flood the `INT0` line with garbage data, causing a critical vulnerability known as **CPU Starvation (Interrupt Storm)**. If unchecked, the MCU spends $100\%$ of its cycles servicing the ISR, preventing the main loop from executing the timer code required to turn off the pump relay.
 
@@ -93,5 +93,5 @@ else  // Checksum mismatch -> Heavy RF noise/reflections detected in the basemen
 rf12_rxrestart(); // Re-initializes RFM12 FIFO mode and cleanly re-arms the INT0 line
 ```
 
-## 📡 Hardware & Antenna Specifications
+## Hardware & Antenna Specifications
 * **Antenna Configuration:** Avoid using folded or closed loops inside metal or thick plastic enclosures, as they suffer massive tuning shifts and severe attenuation. For reliable basement propagation, use a straight, free-hanging **$17.3\text{ cm}$ $\lambda/4$ wire monopole**, ensuring a precise $50\text{--}\Omega$ impedance match directly at the RFM12 output stage.
