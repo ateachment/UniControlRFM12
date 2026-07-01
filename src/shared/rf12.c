@@ -236,6 +236,7 @@ void rf12_rxstart(void)
     RF12_status.Rx = 1;
     rf12_trans(0x0000);         // Read status / reset IRQ
 
+    // Enable INT0 for ATmega8 or GIMSK for ATtiny2313
 #if defined(__AVR_ATtiny2313__) || defined(__AVR_ATtiny2313A__)
     sbi(GIMSK, INT0);           // ATtiny nutzt GIMSK statt GICR!
 #else

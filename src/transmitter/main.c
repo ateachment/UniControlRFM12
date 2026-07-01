@@ -16,7 +16,7 @@
 
 #define LED1     6   // PD6
 #define LED2     5   // PD5
-#define BUTTON1  1   // PB1 (Pin 13 on ATtiny2313) is used as wakeup button
+#define BUTTON1  1   // PB1 (Pin 13 on ATtiny2313) wakeup button, connected to GND
 
 void send(void);
 
@@ -75,10 +75,14 @@ int main(void)
         {
             _delay_ms(10);
         }
-        _delay_ms(50); // Additional bounce protection
+        _delay_ms(50); // Additional bounce protection after release
 
         // --- 3. GO TO SLEEP (POWER-DOWN) ---
         rf12_trans(0x8208); // Shut down RFM12 internal power stage
+
+        // IMPORTANT: Delete the false signal created by releasing the button
+        // in the interrupt flag to prevent immediate wake-up.
+        EIFR |= (1 << PCIF);
 
         sleep_enable();
         sleep_cpu();        // MCU enters deep sleep here.

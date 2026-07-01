@@ -161,13 +161,25 @@ int main(void)
                         relay_timer = max_timer_interval;
                     }
                 }
-                else
+                else  // Checksum mismatch
                 {
-                    PORTD |= (1 << LED1);           // Error double blink
+                    cbi(GICR, INT0);  // Disable INT0 to prevent further interrupts until handled
+
+                    rf12_trans(0x8208); // Receive off
+
+                    // Checksum mismatch -> Error indication
+                    PORTD |= (1 << LED1);   // Error double blink
                     _delay_ms(40);
                     PORTD &= ~(1 << LED1);  
                     _delay_ms(180);
-                    PORTD |= (1 << LED1);
+                    PORTD |= (1 << LED1);   // Still on error indication        
+
+                    // Re-enable INT0 for further reception
+                    // Important: Atmega8 requires a small delay before re-enabling the interrupt to avoid immediate re-triggering
+                    //_delay_ms(40);    // Small delay for stability
+
+                    sbi(GIFR, INTF0); // Clear the interrupt flag
+                    //sbi(GICR, INT0);  // Re-enable INT0 for further reception (flag cleared by writing 1 to the register)
                 }
                 rf12_rxrestart();
             }
