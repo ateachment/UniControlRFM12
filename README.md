@@ -25,7 +25,7 @@ The hardware layout establishes a dedicated, infrastructure-independent RF link 
 +---------------------------------------+         433 MHz RF         +---------------------------------------+
 |             TRANSMITTER               |                            |              RECEIVER                 |
 | (Battery-Powered / Pulsed Low-Power)  | ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~  |      (Mains-Powered / Actuator)       |
-| ATtiny2313 + RFM12 + DIP Mode Switch  |    Concrete Penetration    | ATmega8-16PU + RFM12 + 230V~ Relay    |
+| ATtiny2313 + RFM12                    |    Concrete Penetration    | ATmega8-16PU + RFM12 + 230V~ Relay    |
 +---------------------------------------+                            +---------------------------------------+
 ```
 
