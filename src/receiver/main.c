@@ -49,8 +49,8 @@ int main(void)
     PORTD &= ~(1 << LED1);              // LED1 OFF
 
     // Configure switch pins as inputs and enable internal pull-ups
-    DDRD &= ~((1 << SWITCH_AUTO) | (1 << SWITCH_ON));
-    PORTD |= (1 << SWITCH_AUTO) | (1 << SWITCH_ON);
+    DDRD &= ~((1 << SWITCH_AUTO) | (1 << SWITCH_ON));   // Set as input
+    PORTD |= (1 << SWITCH_AUTO) | (1 << SWITCH_ON);     // Enable pull-ups
 
     // Configure push buttons as inputs and enable pull-ups
     DDRC &= ~(1 << BUTTON_S1);
@@ -97,17 +97,12 @@ int main(void)
         }
 
         // ---------------------------------------------------------------------
-        // MODE 1: ALWAYS ON (SWITCH_ON is pulled to GND)
+        // MODE 1: SLIDE SWITCH ALWAYS ON (SWITCH_ON is pulled to GND)
         // ---------------------------------------------------------------------
-        if (!(PIND & (1 << SWITCH_ON)))
+        if (!(PIND & (1 << SWITCH_ON)))  
         {
             PORTD &= ~(1 << RELAY);      // Turn relay ON (inverted logic)
-            relay_timer = 0;            // Clear timer
-            
-            if(RF12_status.Rx == 0) 
-            {
-                rf12_rxrestart();
-            }
+            relay_timer = 0;             // Clear timer
         }
         
         // ---------------------------------------------------------------------
@@ -144,10 +139,14 @@ int main(void)
             // Standard RF reception handling
             if(RF12_status.Rx == 0)
             {
+                cbi(GICR, INT0);    // Disable INT0 to prevent further interrupts until handled
+                rf12_trans(0x8208); // Receive off
+
                 uint16_t sum;
                 memcpy(&sum, RF12_Data, 2);
-                    
-                if(sum == checksum(RF12_Data+2))    // Checksum matches
+
+                // Validate checksum and expected data pattern
+                if((sum == checksum(RF12_Data+2)) && (strncmp((char*)(RF12_Data+2), "0123456789", 10) == 0))
                 {
                     PORTD |= (1 << LED1);           // Success blink
                     
@@ -163,25 +162,13 @@ int main(void)
                 }
                 else  // Checksum mismatch
                 {
-                    cbi(GICR, INT0);  // Disable INT0 to prevent further interrupts until handled
-
-                    rf12_trans(0x8208); // Receive off
-
-                    // Checksum mismatch -> Error indication
-                    PORTD |= (1 << LED1);   // Error double blink
+                    PORTD |= (1 << LED1);   // Error indication: double blink
                     _delay_ms(40);
                     PORTD &= ~(1 << LED1);  
                     _delay_ms(180);
                     PORTD |= (1 << LED1);   // Still on error indication        
-
-                    // Re-enable INT0 for further reception
-                    // Important: Atmega8 requires a small delay before re-enabling the interrupt to avoid immediate re-triggering
-                    //_delay_ms(40);    // Small delay for stability
-
-                    sbi(GIFR, INTF0); // Clear the interrupt flag
-                    //sbi(GICR, INT0);  // Re-enable INT0 for further reception (flag cleared by writing 1 to the register)
                 }
-                rf12_rxrestart();
+                sbi(GIFR, INTF0); // Clear the interrupt flag
             }
 
             // -----------------------------------------------------------------
@@ -201,21 +188,22 @@ int main(void)
                 {
                     PORTD |= (1 << RELAY);           // Ensure relay remains OFF when timer is 0
                 }
+                
+                if ((GICR & (1 << INT0)) == 0)      // If INT0 is disabled, re-enable it after a short delay
+                {
+                    _delay_ms(10);      // Small hardware stabilization delay
+                    rf12_rxrestart();   // Cleanly restart the RFM12 module for reception
+                }
             }
         }
         
         // ---------------------------------------------------------------------
-        // MODE 3: OFF (Middle position, both pins are HIGH)
+        // MODE 3: SLIDE SWITCH OFF (Middle position, both pins are HIGH)
         // ---------------------------------------------------------------------
         else
         {
             PORTD |= (1 << RELAY);       // Force relay OFF
             relay_timer = 0;
-            
-            if(RF12_status.Rx == 0) 
-            {
-                rf12_rxrestart();
-            }
         }
 
         _delay_ms(40); // Main loop timebase

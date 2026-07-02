@@ -251,7 +251,7 @@ void rf12_rxstart(void)
 #ifdef RF12_INTERRUPT
 void rf12_rxrestart(void)
 {
-	if(RF12_status.Rx == 0)
+	if(RF12_status.Rx == 0)         
 	{
 		rf12_trans(0x82C8);			// RX on
 		rf12_trans(0xCA81);			// set FIFO mode
@@ -271,7 +271,7 @@ void rf12_rxrestart(void)
 #ifdef RF12_INTERRUPT
 ISR(INT0_vect)
 {
-	if(RF12_status.Rx)  // Empfangsbereitschaft
+	if(RF12_status.Rx == 1)  // 
 	{
 		if(RF12_Index < RF12_DataLength+2)  // Puffer nicht voll
             RF12_Data[RF12_Index++] = rf12_trans(0xB000);

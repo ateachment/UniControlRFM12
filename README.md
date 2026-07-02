@@ -51,47 +51,34 @@ Permanently installed in the basement near the DHW circulation pump.
 
 Industrial basements can create severe RF multipath reflections and interference. Under extreme noise, the RFM12 can flood the `INT0` line with garbage data, causing a critical vulnerability known as **CPU Starvation (Interrupt Storm)**. If unchecked, the MCU spends $100\%$ of its cycles servicing the ISR, preventing the main loop from executing the timer code required to turn off the pump relay.
 
-To guarantee absolute system safety and prevent the pump from getting stuck in an infinite `ON` state, the receiver employs a hardware-level decoupling sequence upon checksum failure:
+### RF Decoupling and System Safety (Anti-Lockup Logic)
+To guarantee absolute operational safety of the connected load (e.g., the pump) and prevent it from getting stuck in an indefinite ON state, the receiver software implements a robust protection logic against radio frequency (RF) interference.
 
-```c
-if(sum == checksum(RF12_Data+2))    // Checksum matches
-{
-    PORTD |= (1 << LED1);           // Success blink
-    
-    if (op_mode == MODE_TOGGLE)
-    {
-        PORTD ^= (1 << LED2);       // Invert relay state via RF
-    }
-    else
-    {
-        PORTD &= ~(1 << LED2);      // Turn relay ON
-        relay_timer = max_timer_interval;
-    }
-}
-else  // Checksum mismatch -> Heavy RF noise/reflections detected in the basement
-{
-    // 1. Instantly disable INT0 to shield the core CPU from the interrupt storm
-    cbi(GICR, INT0); 
+In challenging environments such as basements, persistent electromagnetic noise or signal reflections can cause the RF module to bombard the CPU with a continuous storm of corrupted interrupts. Without a built-in safeguard, this interrupt overload would choke the main execution loop, causing countdown timers to slow down drastically or freeze entirely.
 
-    // 2. Shut down the RF receiver stage to clear internal hardware buffers
-    rf12_trans(0x8208); // Receive off
+### The Decoupling Sequence on Signal Failure
+The moment the RF module signals that data is available, but the payload either fails the checksum validation or does not match the expected protocol content (indicating pure ambient noise), a multi-stage safety sequence is triggered immediately:
 
-    // 3. Visual error feedback (Double-flash sequence on LED1)
-    PORTD |= (1 << LED1);   
-    _delay_ms(40);
-    PORTD &= ~(1 << LED1);  
-    _delay_ms(180);
-    PORTD |= (1 << LED1);        
+1. CPU Shielding: The external RF interrupt line (INT0) is instantly disabled at the hardware level. This shields the core processor from subsequent incoming RF garbage, ensuring that processing power remains entirely dedicated to the internal system controls.
 
-    // 4. Manually clear any accumulated garbage interrupt flags in the hardware register.
-    // On ATmega8, the flag is cleared by writing a logical '1' to it!
-    sbi(GIFR, INTF0); // Clear the INT0 flag
-    
-    // Note: Manual re-enabling of INT0 via sbi(GICR, INT0) is omitted here, 
-    // as the subsequent rf12_rxrestart() function automatically re-enables it cleanly.
-}
-rf12_rxrestart(); // Re-initializes RFM12 FIFO mode and cleanly re-arms the INT0 line
-```
+2. Hardware Shutdown: The receiver stage of the RF module is physically powered down. This flushes the internal hardware buffers (FIFO) of the radio chip and stops the generation of further noise signals at the root.
+
+3. Visual Diagnostics: A distinct visual LED error sequence is executed to provide real-time feedback that an invalid RF state was detected and handled.
+
+4. Register Cleansing: Any pending or accumulated invalid interrupt flags within the microcontroller's hardware registers are explicitly cleared to eliminate the risk of triggering "ghost interrupts" upon re-arming.
+
+### Prioritizing Timers and Manual Controls
+By temporarily silencing the radio component, the main control loop is completely liberated. The system utilizes this vital breathing room to perform its core responsibilities with maximum precision:
+
+* Scanning the physical push-buttons for manual override (On, Off, or Toggle commands) at a fluid, millisecond-accurate rate.
+
+* Decrementing the countdown timer for the relay within the exact required timebase.
+
+Only after all critical tasks (button polling and timer updates) for the current cycle have been successfully processed does the system proceed to the very end of the loop, where it safely re-initializes and re-arms the RF module back into listening mode. If the heavy RF noise persists, the protection cycle seamlessly repeats.
+
+The Result: Even under a massive, continuous RF noise storm in a basement environment, the system remains fully responsive to manual inputs, and the relay is guaranteed to shut off punctually once the countdown expires.
+
+
 
 ## Hardware & Antenna Specifications
 * **Antenna Configuration:** Avoid using folded or closed loops inside metal or thick plastic enclosures, as they suffer massive tuning shifts and severe attenuation. For reliable basement propagation, use a straight, free-hanging **$17.3\text{ cm}$ $\lambda/4$ wire monopole**, ensuring a precise $50\text{--}\Omega$ impedance match directly at the RFM12 output stage.
