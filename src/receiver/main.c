@@ -140,7 +140,10 @@ int main(void)
             if(RF12_status.Rx == 0)
             {
                 cbi(GICR, INT0);    // Disable INT0 to prevent further interrupts until handled
-                rf12_trans(0x8208); // Receive off
+
+                // 
+                rf12_trans(0xCA80);  // FIFO reset => clear FIFO buffer => Interrupt flag cleared
+                rf12_trans(0x8208);  // Receive off
 
                 uint16_t sum;
                 memcpy(&sum, RF12_Data, 2);
@@ -160,12 +163,12 @@ int main(void)
                         relay_timer = max_timer_interval;
                     }
                 }
-                else  // Checksum mismatch
+                else  // Checksum mismatch or unexpected data => wrong data received or noise
                 {
                     PORTD |= (1 << LED1);   // Error indication: double blink
                     _delay_ms(40);
                     PORTD &= ~(1 << LED1);  
-                    _delay_ms(180);
+                    _delay_ms(80);
                     PORTD |= (1 << LED1);   // Still on error indication        
                 }
                 sbi(GIFR, INTF0); // Clear the interrupt flag
