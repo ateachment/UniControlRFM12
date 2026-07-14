@@ -21,7 +21,7 @@ int main(void)
     DDRB  |= (1 << PB1);
     PORTB |= (1 << PB1);
 
-    _delay_ms(5); // Allow the power supply to stabilize before proceeding with the rest of the initialization.
+    //_delay_ms(5); // Allow the power supply to stabilize before proceeding with the rest of the initialization.
 
     /*
     // Debugging: N-Ch MOSFET gate test (PB1) - duty cycle: 10 ms HIGH, 10 ms LOW = 50% ~ 1,5 Volt
